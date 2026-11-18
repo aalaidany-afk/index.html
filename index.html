@@ -6,6 +6,7 @@
 <title>سجلّ النتائج المدرسي — البوابة الرئيسية</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --bg:#050816; --text:#EEF2FF; --dim:rgba(226,232,255,.66); --faint:rgba(226,232,255,.4);
@@ -15,18 +16,75 @@
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--text);font-family:'Cairo','Segoe UI',Tahoma,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
 
+
+/* ============ BACKGROUND (shared) ============ */
+#bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+#bg .aurora,#bg .grid-bg{position:absolute;inset:0;z-index:0}
+#bg #fx{position:absolute;inset:0;z-index:0}
+.stage{background:transparent;z-index:1}
+.navr{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.userbox{display:none;align-items:center;gap:10px;font-size:12.5px;color:var(--dim);padding:5px 6px 5px 14px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.16)}
+.userbox button{display:inline-flex;align-items:center;gap:6px;font-family:inherit;font-weight:700;font-size:12.5px;color:#fff;background:rgba(251,113,133,.18);border:1px solid rgba(251,113,133,.4);border-radius:999px;padding:6px 12px;cursor:pointer}
+.userbox button:hover{background:rgba(251,113,133,.32)}
+.userbox svg{width:14px;height:14px}
+body.authed .userbox{display:inline-flex}
+body.locked .stage,body.locked .workspace{display:none!important}
+.gate{display:none;position:fixed;inset:0;z-index:5;align-items:center;justify-content:center;padding:20px;overflow-y:auto}
+body.locked .gate{display:flex}
+.gcard{position:relative;width:100%;max-width:440px;padding:38px 34px 26px;border-radius:30px;text-align:center;
+  background:linear-gradient(160deg,rgba(255,255,255,.11),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.16);
+  backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);box-shadow:0 50px 90px -40px rgba(0,0,0,.9),0 0 80px -30px rgba(129,140,248,.6);animation:rise .8s cubic-bezier(.2,.8,.2,1) both}
+.gcard::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;pointer-events:none;
+  background:conic-gradient(from var(--ang,0deg),transparent 0 70%,var(--indigo),var(--teal),transparent);animation:ang 7s linear infinite;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;opacity:.8}
+@property --ang{syntax:'<angle>';inherits:false;initial-value:0deg}
+@keyframes ang{to{--ang:360deg}}
+.crest.sm{width:78px;height:78px;margin:0 auto 18px}
+.crest.sm .core{width:58px;height:58px}.crest.sm svg{width:28px;height:28px}.crest.sm::after{inset:-9px}
+.gcard h2{margin:0 0 6px;font-size:28px;font-weight:900}
+.gsub{margin:0 0 24px;color:var(--dim);font-size:14px;line-height:1.9}
+.gcard form{text-align:right}
+.gcard label{display:block;font-size:12.5px;font-weight:700;color:#C7D2FE;margin:0 0 7px}
+.fld{position:relative;margin-bottom:16px}
+.fld>svg{position:absolute;right:14px;top:50%;transform:translateY(-50%);width:19px;height:19px;color:var(--faint);pointer-events:none;transition:color .2s}
+.fld input{width:100%;font-family:inherit;font-size:15px;color:#fff;background:rgba(5,8,22,.55);border:1.5px solid rgba(255,255,255,.14);border-radius:14px;padding:13px 44px 13px 44px;text-align:left;transition:border-color .2s,box-shadow .2s}
+.fld input::placeholder{color:rgba(226,232,255,.3)}
+.fld input:focus{outline:none;border-color:var(--indigo);box-shadow:0 0 0 4px rgba(129,140,248,.2)}
+.fld:focus-within>svg{color:var(--indigo)}
+.eye{position:absolute;left:8px;top:50%;transform:translateY(-50%);background:none;border:0;color:var(--faint);cursor:pointer;padding:6px;border-radius:8px;display:grid;place-items:center}
+.eye:hover{color:#fff;background:rgba(255,255,255,.08)}
+.eye svg{width:19px;height:19px}
+.gbtn{width:100%;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:inherit;font-weight:800;font-size:15.5px;color:#fff;border:0;border-radius:14px;padding:14px;cursor:pointer;
+  background:linear-gradient(120deg,#6366F1,#3B82F6 55%,#0EA5A4);background-size:160% 100%;box-shadow:0 20px 34px -16px #6366F1;transition:transform .15s,background-position .4s,box-shadow .2s}
+.gbtn:hover:not(:disabled){transform:translateY(-2px);background-position:100% 0}
+.gbtn:disabled{opacity:.7;cursor:wait}
+.gbtn svg{width:18px;height:18px;transition:transform .2s}.gbtn:hover svg{transform:translateX(-4px)}
+.glink{display:block;margin:14px auto 0;background:none;border:0;font-family:inherit;font-size:13px;font-weight:600;color:#A5B4FC;cursor:pointer;text-decoration:underline;text-underline-offset:4px}
+.glink:hover{color:#fff}
+.gerr,.gok{display:none;align-items:center;gap:10px;text-align:right;font-size:13.5px;line-height:1.7;padding:11px 14px;border-radius:12px;margin-bottom:16px}
+.gerr{background:rgba(251,113,133,.13);border:1px solid rgba(251,113,133,.4);color:#FDA4AF}
+.gerr svg{width:20px;height:20px;flex:none}
+.gok{background:rgba(45,212,191,.12);border:1px solid rgba(45,212,191,.4);color:#99F6E4}
+.gerr.show,.gok.show{display:flex}
+.gwarn{display:none;margin-top:18px;padding:12px 14px;border-radius:12px;font-size:12.5px;line-height:1.9;color:#FDE68A;background:rgba(251,191,36,.1);border:1px dashed rgba(251,191,36,.4);text-align:right}
+.gwarn.show{display:block}
+.gwarn b{direction:ltr;unicode-bidi:embed;font-family:monospace;font-size:11.5px}
+.gfoot{margin-top:22px;font-size:12px;color:var(--faint)}.gfoot b{color:var(--dim)}
+@keyframes spin2{to{transform:rotate(360deg)}}
+.spin{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin2 .7s linear infinite}
+
 /* ============ HOME ============ */
 .stage{position:relative;min-height:100vh;overflow:hidden;isolation:isolate}
 .stage.hidden{display:none}
-#fx{position:fixed;inset:0;z-index:-1;width:100%;height:100%;pointer-events:none}
-.aurora{position:absolute;inset:0;z-index:-2;overflow:hidden}
+#fx{width:100%;height:100%}
+.aurora{overflow:hidden}
 .aurora i{position:absolute;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 18s ease-in-out infinite alternate}
 .aurora i:nth-child(1){width:560px;height:560px;background:#3B4BD8;top:-200px;right:-120px}
 .aurora i:nth-child(2){width:520px;height:520px;background:#0E9F8E;bottom:-220px;left:-140px;animation-delay:-6s}
 .aurora i:nth-child(3){width:380px;height:380px;background:#B5368B;top:30%;left:34%;opacity:.26;animation-delay:-10s}
 .aurora i:nth-child(4){width:320px;height:320px;background:#D79A0C;top:8%;left:8%;opacity:.2;animation-delay:-3s}
 @keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(50px,36px) scale(1.18)}}
-.grid-bg{position:absolute;inset:0;z-index:-2;opacity:.5;
+.grid-bg{opacity:.5;
   background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
   background-size:56px 56px;-webkit-mask-image:radial-gradient(70% 60% at 50% 30%,#000,transparent);mask-image:radial-gradient(70% 60% at 50% 30%,#000,transparent)}
 
@@ -103,7 +161,7 @@ footer b{color:var(--dim)}
 @media(prefers-reduced-motion:reduce){.aurora i,.crest::before,.crest::after,h1 span,.card,.ico::after,.live i{animation:none}}
 
 /* ============ WORKSPACE ============ */
-.workspace{display:none;height:100vh;flex-direction:column;background:#070B1D}
+.workspace{position:relative;z-index:2;display:none;height:100vh;flex-direction:column;background:#070B1D}
 .workspace.active{display:flex}
 .topbar{flex-shrink:0;display:flex;align-items:center;gap:14px;padding:12px 20px;background:rgba(10,14,36,.92);border-bottom:1px solid rgba(255,255,255,.1);position:relative}
 .topbar::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,var(--teal),var(--indigo),var(--amber),var(--coral))}
@@ -121,16 +179,48 @@ footer b{color:var(--dim)}
 @media(max-width:700px){.tab span{display:none}.back span{display:none}}
 </style>
 </head>
-<body>
+<body class="locked">
 
-<div class="stage" id="stage">
+<div id="bg">
   <div class="aurora"><i></i><i></i><i></i><i></i></div>
   <div class="grid-bg"></div>
   <canvas id="fx"></canvas>
+</div>
+
+<!-- ============ بوابة الدخول ============ -->
+<div class="gate" id="gate">
+  <div class="gcard">
+    <div class="crest sm"><div class="core"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5-9-5z"/><path d="M7 11.5V16c0 1.4 2.2 3 5 3s5-1.6 5-3v-4.5"/><path d="M21 9v6"/></svg></div></div>
+    <h2>مرحباً بك</h2>
+    <p class="gsub">سجّل الدخول للوصول إلى منظومة اللجنة الامتحانية</p>
+
+    <div class="gerr" id="gerr" role="alert"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span id="gerrTxt"></span></div>
+    <div class="gok" id="gok"></div>
+
+    <form id="loginForm" autocomplete="on" novalidate>
+      <label for="email">البريد الإلكتروني</label>
+      <div class="fld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3.5 7.5l8.5 6 8.5-6"/></svg>
+        <input type="email" id="email" placeholder="example@domain.com" dir="ltr" autocomplete="username" required></div>
+      <label for="password">كلمة المرور</label>
+      <div class="fld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10" rx="3"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>
+        <input type="password" id="password" placeholder="••••••••" dir="ltr" autocomplete="current-password" required>
+        <button type="button" class="eye" id="eye" aria-label="إظهار كلمة المرور"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+      <button type="submit" class="gbtn" id="btnSubmit"><span>تسجيل الدخول</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+      <button type="button" class="glink" id="forgot">نسيت كلمة المرور؟</button>
+    </form>
+
+    <div class="gwarn" id="gwarn">لم تُضبط بيانات Supabase بعد. ضع <b>SUPABASE_URL</b> و<b>SUPABASE_KEY</b> في أعلى سكربت الصفحة لتفعيل تسجيل الدخول الفعلي.
+      <button type="button" class="glink" id="demoBtn">دخول تجريبي للمعاينة فقط</button></div>
+    <div class="gfoot">صُمِّمَ بواسطة <b>التدريسي علي العيداني</b></div>
+  </div>
+</div>
+
+<div class="stage" id="stage">
   <div class="wrap">
     <div class="nav">
       <div class="logo"><div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-5 9 5-9 5-9-5z"/><path d="M7 11.5V16c0 1.4 2.2 3 5 3s5-1.6 5-3v-4.5"/><path d="M21 9v6"/></svg></div><div>اللجنة الامتحانية<small>منظومة النتائج الرقمية</small></div></div>
-      <span class="live"><i></i>منصّة رقمية موحّدة</span>
+      <div class="navr"><span class="live"><i></i>منصّة رقمية موحّدة</span>
+        <div class="userbox" id="userbox"><span id="userMail" dir="ltr"></span><button type="button" onclick="handleLogout()" title="تسجيل الخروج"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>خروج</span></button></div></div>
     </div>
 
     <section class="hero">
@@ -185,6 +275,7 @@ footer b{color:var(--dim)}
       <button class="tab" style="--a:var(--amber)" data-target="frame-results" data-title="كشف النتائج"><i></i><span>كشف النتائج</span></button>
       <button class="tab" style="--a:var(--coral)" data-target="frame-print" data-title="طباعة النتائج"><i></i><span>الطباعة</span></button>
     </div>
+    <button class="back" type="button" onclick="handleLogout()" title="تسجيل الخروج"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>خروج</span></button>
   </div>
   <div class="frame-holder">
     <iframe id="frame-voice" title="الإدخال الصوتي للدرجات"></iframe>
@@ -277,6 +368,73 @@ footer b{color:var(--dim)}
   addEventListener('resize', sizeFx);
   addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
   sizeFx(); startFx();
+
+  /* ================= تسجيل الدخول (Supabase) ================= */
+  // ضع بيانات مشروعك من Supabase هنا (Project Settings → API)
+  const SUPABASE_URL = 'https://YOUR_PROJECT_ID.supabase.co';
+  const SUPABASE_KEY = 'YOUR_ANON_KEY';
+  const CONFIGURED = !/YOUR_PROJECT_ID|YOUR_ANON_KEY/.test(SUPABASE_URL + SUPABASE_KEY);
+  let sb = null;
+  try{ if (CONFIGURED && window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY); }catch(e){ console.error(e); }
+
+  const $g = id => document.getElementById(id);
+  function gErr(m){ $g('gok').classList.remove('show'); $g('gerrTxt').textContent = m; $g('gerr').classList.toggle('show', !!m); }
+  function gOk(m){ $g('gerr').classList.remove('show'); $g('gok').textContent = m; $g('gok').classList.toggle('show', !!m); }
+  function unlock(user){
+    document.body.classList.remove('locked'); document.body.classList.add('authed');
+    $g('userMail').textContent = (user && user.email) || 'مستخدم تجريبي';
+    startFx();
+  }
+  function lock(){
+    document.body.classList.add('locked'); document.body.classList.remove('authed');
+    document.getElementById('workspace').classList.remove('active');
+    document.getElementById('stage').classList.remove('hidden');
+    document.title = 'تسجيل الدخول — منظومة اللجنة الامتحانية';
+    startFx();
+  }
+  function arMsg(err){
+    const m = (err && err.message || '').toLowerCase();
+    if (m.includes('invalid login')) return 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+    if (m.includes('not confirmed')) return 'لم يتم تأكيد البريد الإلكتروني بعد، راجع بريدك';
+    if (m.includes('rate') || m.includes('too many')) return 'محاولات كثيرة، انتظر قليلاً ثم أعد المحاولة';
+    if (m.includes('fetch') || m.includes('network')) return 'تعذّر الاتصال بالخادم، تحقق من الإنترنت';
+    return 'تعذّر تسجيل الدخول، حاول مرة أخرى';
+  }
+  $g('loginForm').addEventListener('submit', async e => {
+    e.preventDefault(); gErr('');
+    const email = $g('email').value.trim(), password = $g('password').value;
+    if (!email || !password){ gErr('أدخل البريد الإلكتروني وكلمة المرور'); return; }
+    if (!sb){ gErr(CONFIGURED ? 'تعذّر تحميل مكتبة Supabase، تحقق من الإنترنت' : 'لم تُضبط بيانات Supabase بعد'); return; }
+    const btn = $g('btnSubmit'), old = btn.innerHTML;
+    btn.disabled = true; btn.innerHTML = '<i class="spin"></i><span>جارٍ التحقق…</span>';
+    try{
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) gErr(arMsg(error)); else { $g('password').value = ''; unlock(data.user); }
+    }catch(err){ gErr(arMsg(err)); }
+    btn.disabled = false; btn.innerHTML = old;
+  });
+  $g('eye').addEventListener('click', () => { const i = $g('password'); i.type = i.type === 'password' ? 'text' : 'password'; });
+  $g('forgot').addEventListener('click', async () => {
+    const email = $g('email').value.trim();
+    if (!email){ gErr('اكتب بريدك الإلكتروني أولاً ثم اضغط «نسيت كلمة المرور»'); return; }
+    if (!sb){ gErr('لم تُضبط بيانات Supabase بعد'); return; }
+    const { error } = await sb.auth.resetPasswordForEmail(email);
+    if (error) gErr(arMsg(error)); else gOk('تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك');
+  });
+  async function handleLogout(){
+    try{ if (sb) await sb.auth.signOut(); }catch(e){}
+    lock();
+  }
+  $g('demoBtn').addEventListener('click', () => unlock(null));
+  (async function initAuth(){
+    if (!CONFIGURED){ $g('gwarn').classList.add('show'); lock(); return; }
+    if (!sb){ gErr('تعذّر تحميل مكتبة Supabase، تحقق من الإنترنت'); lock(); return; }
+    try{
+      const { data } = await sb.auth.getSession();
+      if (data && data.session) unlock(data.session.user); else lock();
+      sb.auth.onAuthStateChange((ev, session) => { if (ev === 'SIGNED_OUT') lock(); });
+    }catch(e){ lock(); }
+  })();
 </script>
 </body>
 </html>
